@@ -226,7 +226,10 @@ function App() {
             {mode === "idle" ? "START" : "RESET"}
           </button>
         </div>
-        <p className="status">{mode === "done" ? "Session complete." : ""}</p>
+        <div className="copy">
+          {mode === "done" ? <p className="status">Session complete.</p> : null}
+          <p className="caption">Chimes every 15 minutes, then stops at 1 hour.</p>
+        </div>
       </main>
     </div>
   );

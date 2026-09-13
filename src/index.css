@@ -37,6 +37,7 @@ body {
   background: var(--bg);
   color: var(--ink);
   font-family: "Work Sans", sans-serif;
+  -webkit-tap-highlight-color: transparent;
   transition:
     background 0.4s ease,
     color 0.4s ease;
@@ -46,13 +47,17 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  min-height: 100dvh;
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
 }
 
 header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 1.6rem clamp(1.2rem, 4vw, 2.4rem);
+  padding: 1.1rem clamp(1rem, 4vw, 2.4rem);
+  flex-shrink: 0;
 }
 
 .brand {
@@ -68,8 +73,8 @@ header {
 }
 
 .icon-btn {
-  width: 40px;
-  height: 40px;
+  width: 44px;
+  height: 44px;
   border-radius: 50%;
   border: 1px solid var(--btn-border);
   background: var(--face);
@@ -78,6 +83,7 @@ header {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     border-color 0.2s ease,
     transform 0.15s ease;
@@ -113,14 +119,15 @@ main {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 1.6rem;
-  padding: 1rem 1.5rem 3rem;
+  gap: 1.25rem;
+  padding: 0.4rem 1.25rem 1.6rem;
 }
 
 .clock-face {
   position: relative;
   isolation: isolate;
-  width: min(66vmin, 440px);
+  width: min(84vw, calc(100vh - 13.5rem), 440px);
+  width: min(84vw, calc(100dvh - 13.5rem), 440px);
   aspect-ratio: 1;
   border-radius: 50%;
   background: var(--face);
@@ -244,9 +251,10 @@ main {
   background: var(--face);
   color: var(--ink);
   font-family: "Fraunces", serif;
-  font-size: clamp(1.35rem, 3.6vmin, 1.85rem);
+  font-size: clamp(1.15rem, 4.6vw, 1.85rem);
   letter-spacing: 0.06em;
   cursor: pointer;
+  touch-action: manipulation;
   transition:
     border-color 0.2s ease,
     transform 0.15s ease,
@@ -261,13 +269,48 @@ main {
   transform: translate(-50%, -50%) scale(0.96);
 }
 
-.status {
+.copy {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  max-width: 18.5rem;
+  padding: 0 0.25rem;
+}
+
+.status,
+.caption {
   margin: 0;
-  color: var(--ink-soft);
-  font-size: 0.9rem;
-  letter-spacing: 0.01em;
   text-align: center;
-  min-height: 1.2em;
+  line-height: 1.45;
+}
+
+.status {
+  color: var(--ink);
+  font-size: 0.95rem;
+}
+
+.caption {
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  letter-spacing: 0.01em;
+}
+
+@media (max-height: 640px) {
+  header {
+    padding-top: 0.75rem;
+    padding-bottom: 0.75rem;
+  }
+
+  main {
+    gap: 0.9rem;
+    padding-bottom: 1rem;
+  }
+
+  .clock-face {
+    width: min(78vw, calc(100vh - 11.5rem), 360px);
+    width: min(78vw, calc(100dvh - 11.5rem), 360px);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
