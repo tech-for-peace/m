@@ -34,6 +34,35 @@ function applyHands(minuteEl, secondEl, elapsed) {
   setHand(secondEl, ((clamped % 60_000) / 60_000) * 360);
 }
 
+function scheduleChime(ctx, at) {
+  const master = ctx.createGain();
+  master.gain.setValueAtTime(0, at);
+  master.gain.linearRampToValueAtTime(0.25, at + 0.06);
+  master.gain.exponentialRampToValueAtTime(0.0001, at + 3.4);
+  master.connect(ctx.destination);
+
+  const oscillators = [528, 792].map((freq, i) => {
+    const osc = ctx.createOscillator();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    const gain = ctx.createGain();
+    gain.gain.value = i === 0 ? 1 : 0.32;
+    osc.connect(gain);
+    gain.connect(master);
+    osc.start(at);
+    osc.stop(at + 3.5);
+    return osc;
+  });
+
+  // A chime that is already sounding, or about to, is left to ring out so the
+  // final one is not clipped by the session ending on it.
+  return () => {
+    if (ctx.currentTime >= at - 0.5) return;
+    oscillators.forEach((osc) => osc.stop());
+    master.disconnect();
+  };
+}
+
 function App() {
   const [session] = useState(loadSession);
   const [theme, setTheme] = useState(() => document.documentElement.dataset.theme || "light");
@@ -53,32 +82,52 @@ function App() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  const playChime = useCallback(() => {
+  const getAudio = useCallback(() => {
     if (!audioCtx.current) {
       audioCtx.current = new (window.AudioContext || window.webkitAudioContext)();
     }
     if (audioCtx.current.state === "suspended") audioCtx.current.resume();
-
-    const ctx = audioCtx.current;
-    const now = ctx.currentTime;
-    const master = ctx.createGain();
-    master.gain.setValueAtTime(0, now);
-    master.gain.linearRampToValueAtTime(0.25, now + 0.06);
-    master.gain.exponentialRampToValueAtTime(0.0001, now + 3.4);
-    master.connect(ctx.destination);
-
-    [528, 792].forEach((freq, i) => {
-      const osc = ctx.createOscillator();
-      osc.type = "sine";
-      osc.frequency.value = freq;
-      const g = ctx.createGain();
-      g.gain.value = i === 0 ? 1 : 0.32;
-      osc.connect(g);
-      g.connect(master);
-      osc.start(now);
-      osc.stop(now + 3.5);
-    });
+    return audioCtx.current;
   }, []);
+
+  const playChime = useCallback(() => {
+    const ctx = getAudio();
+    scheduleChime(ctx, ctx.currentTime);
+  }, [getAudio]);
+
+  // Quarter chimes ride the audio clock instead of timers, which browsers
+  // throttle to once a minute once the tab has been hidden for a while.
+  const scheduleQuarterChimes = useCallback(
+    (startTime) => {
+      const ctx = getAudio();
+      let pending = [];
+
+      const cancelPending = () => {
+        pending.forEach((cancel) => cancel());
+        pending = [];
+      };
+
+      const schedule = () => {
+        cancelPending();
+        if (ctx.state !== "running") return;
+        const now = Date.now();
+        for (let q = 1; q <= QUARTERS; q++) {
+          const target = startTime + q * INTERVAL_MS;
+          if (target > now)
+            pending.push(scheduleChime(ctx, ctx.currentTime + (target - now) / 1000));
+        }
+      };
+
+      schedule();
+      ctx.addEventListener("statechange", schedule);
+
+      return () => {
+        ctx.removeEventListener("statechange", schedule);
+        cancelPending();
+      };
+    },
+    [getAudio],
+  );
 
   const goIdle = useCallback(() => {
     localStorage.removeItem(STORAGE_KEY);
@@ -101,8 +150,7 @@ function App() {
     }
 
     const startTime = startTimeRef.current;
-    const alreadyPassed = quartersFromStart(startTime);
-    setLitQuarters(alreadyPassed);
+    const cancelChimes = scheduleQuarterChimes(startTime);
 
     let frameId = 0;
     const tick = () => {
@@ -112,30 +160,16 @@ function App() {
         return;
       }
       setElapsedHands(elapsed);
+      setLitQuarters(quartersFromStart(startTime));
       frameId = requestAnimationFrame(tick);
     };
     frameId = requestAnimationFrame(tick);
 
-    const timers = [];
-    for (let q = alreadyPassed + 1; q <= QUARTERS; q++) {
-      const delay = q * INTERVAL_MS - (Date.now() - startTime);
-      timers.push(
-        setTimeout(
-          () => {
-            setLitQuarters(q);
-            playChime();
-            if (q === QUARTERS) goDone();
-          },
-          Math.max(0, delay),
-        ),
-      );
-    }
-
     return () => {
       cancelAnimationFrame(frameId);
-      timers.forEach(clearTimeout);
+      cancelChimes();
     };
-  }, [mode, goDone, playChime, setElapsedHands]);
+  }, [mode, goDone, scheduleQuarterChimes, setElapsedHands]);
 
   function toggleTheme() {
     const next = theme === "dark" ? "light" : "dark";
